@@ -1,0 +1,62 @@
+@startuml
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam rectangle {
+  RoundCorner 8
+  BorderColor #444444
+  BackgroundColor #EAF2F8
+}
+skinparam database {
+  BackgroundColor #D6E4F0
+  BorderColor #444444
+}
+
+left to right direction
+
+title SmartCampus AI - Diagramme de conteneurs (sprint 1)
+
+actor "Candidat" as candidat
+actor "Equipe admission" as staff
+
+rectangle "SmartCampus AI" as system {
+  rectangle "Frontend web\nNext.js / React" as web {
+  }
+
+  rectangle "API FastAPI\nPython" as api {
+  }
+
+  rectangle "Service conversationnel\nOrchestration LangGraph" as conv {
+  }
+
+  rectangle "Service RAG\nPython" as rag {
+  }
+
+  rectangle "Pipeline d'ingestion documentaire\nPython" as ing {
+  }
+
+  database "Base relationnelle\nPostgreSQL" as db
+  database "Index vectoriel\nPostgreSQL + pgvector" as vec
+  database "Stockage documentaire prive\nObject storage" as files
+}
+
+cloud "Fournisseur LLM" as llm
+cloud "Service STT / TTS\nWhisper, optionnel" as stt
+cloud "Email / calendrier" as mail
+
+candidat --> web : Utilise / HTTPS
+staff --> web : Utilise / HTTPS
+web --> api : Messages et actions / JSON
+api --> conv : Delegue la conversation
+conv --> llm : Genere une reponse
+conv --> rag : Consulte les sources
+rag --> vec : Recherche les passages / SQL
+api --> db : Lit et ecrit / SQL
+api --> files : Stocke les pieces jointes
+api --> stt : Transcrit l'audio
+api --> mail : Envoie notifications
+staff --> ing : Depose les documents officiels
+ing --> files : Archive les originaux
+ing --> vec : Indexe les documents valides
+
+@enduml

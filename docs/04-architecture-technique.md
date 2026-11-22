@@ -17,24 +17,9 @@ L’architecture est conçue pour un prototype évolutif : un déploiement simpl
 
 ## 3. Architecture logique
 
-```mermaid
-flowchart LR
-    Candidate["Candidat<br/>navigateur texte / audio"] --> Web["Frontend Next.js / React"]
-    Staff["Équipe admission<br/>académique, entretien, direction, admin"] --> Web
-    Web -->|HTTPS / API JSON| API["Backend FastAPI<br/>auth, permissions, règles métier"]
+![Architecture technique C4 - conteneurs](diagrams/architecture-technique.svg)
 
-    API --> Chat["Service conversation"]
-    Chat --> Agent["Orchestrateur LangGraph<br/>profil, intention, prochaines actions"]
-    Agent --> LLM["Fournisseur LLM<br/>interface interchangeable"]
-    Agent --> RAG["Service RAG<br/>recherche, sources, citations"]
-    RAG --> Vector[("PostgreSQL + pgvector")]
-    API --> DB[("PostgreSQL<br/>comptes, profils, candidatures,<br/>QCM, rendez-vous, audit")]
-    API --> Files["Stockage de documents<br/>brochures et pièces jointes"]
-    API --> Speech["Adaptateur STT / TTS<br/>Whisper, audio optionnel"]
-    API --> Notify["Adaptateur notifications<br/>email / calendrier"]
-    Admin["Administrateur"] -->|documents officiels| Ingestion["Pipeline d’ingestion<br/>validation, découpage, indexation"]
-    Ingestion --> Vector
-```
+[Source PlantUML du diagramme](diagrams/architecture-technique.puml)
 
 Le stockage relationnel et l’index vectoriel peuvent partager PostgreSQL avec pgvector au démarrage. Les documents originaux sont conservés dans un stockage de fichiers; leurs métadonnées, versions, droits et références sont enregistrés en base.
 
@@ -95,17 +80,7 @@ En développement, l’application peut être lancée avec trois services conten
 
 En environnement déployé, le frontend et l’API sont exposés derrière un reverse proxy HTTPS. La base et le stockage documentaire ne sont pas accessibles directement depuis le navigateur. Les sauvegardes, la supervision, les limites de coût des appels IA et la gestion des données personnelles sont configurées avant tout usage avec de vrais candidats.
 
-```mermaid
-flowchart TB
-    Browser["Navigateur"] --> Proxy["Reverse proxy HTTPS"]
-    Proxy --> Front["Frontend web"]
-    Proxy --> Backend["API FastAPI"]
-    Backend --> PostgreSQL[("PostgreSQL + pgvector")]
-    Backend --> ObjectStore["Stockage documentaire privé"]
-    Backend --> External["LLM / STT / Email / calendrier<br/>via adaptateurs"]
-    Ops["Configuration, logs, sauvegardes"] -.-> Backend
-    Ops -.-> PostgreSQL
-```
+Le déploiement Docker du prototype utilise les conteneurs représentés dans le diagramme C4 : le navigateur accède à l’interface Next.js et à l’API FastAPI derrière le reverse proxy HTTPS, tandis que PostgreSQL avec pgvector, le stockage documentaire privé et les fournisseurs externes restent isolés derrière le backend.
 
 ## 8. Décisions et points à valider
 

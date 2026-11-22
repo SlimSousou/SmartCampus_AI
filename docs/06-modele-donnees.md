@@ -4,80 +4,9 @@
 
 Le schéma SQLAlchemy du backend réutilise la table `users` de SA-27/SA-28. Il ajoute les profils candidats, le catalogue IIT/ISB, les candidatures et recommandations, les sources documentaires, les segments de texte et l’historique de synchronisation.
 
-```mermaid
-erDiagram
-    USERS ||--o| CANDIDATE_PROFILES : possede
-    USERS ||--o{ CANDIDATE_APPLICATIONS : depose
-    PROGRAMS ||--o{ CANDIDATE_APPLICATIONS : concerne
-    CANDIDATE_APPLICATIONS ||--o{ RECOMMENDATIONS : recoit
-    PROGRAMS ||--o{ RECOMMENDATIONS : propose
-    USERS o|--o{ RECOMMENDATIONS : valide
-    USERS o|--o{ DOCUMENT_SOURCES : depose
-    DOCUMENT_SOURCES ||--o{ DOCUMENT_CHUNKS : contient
-    DOCUMENT_SOURCES ||--o{ DOCUMENT_SYNC_RUNS : synchronise
-    USERS ||--o{ REFRESH_SESSIONS : authentifie
-    USERS ||--o{ AUDIT_EVENTS : agit
+![Modèle relationnel IIT/ISB](diagrams/modele-relationnel.svg)
 
-    USERS {
-        uuid id PK
-        string email UK
-        string role
-        boolean is_active
-    }
-    CANDIDATE_PROFILES {
-        uuid id PK
-        uuid user_id FK,UK
-        string current_education
-        int graduation_year
-        string target_institution
-    }
-    PROGRAMS {
-        uuid id PK
-        string institution
-        string name
-        string level
-        boolean is_published
-        boolean is_demo
-    }
-    CANDIDATE_APPLICATIONS {
-        uuid id PK
-        uuid candidate_user_id FK
-        uuid program_id FK
-        string academic_year
-        string status
-        int version
-    }
-    RECOMMENDATIONS {
-        uuid id PK
-        uuid application_id FK
-        uuid program_id FK
-        decimal score
-        string status
-        uuid reviewed_by_user_id FK
-    }
-    DOCUMENT_SOURCES {
-        uuid id PK
-        string institution
-        string storage_key
-        string checksum_sha256
-        int version
-        string status
-    }
-    DOCUMENT_CHUNKS {
-        uuid id PK
-        uuid document_source_id FK
-        int chunk_index
-        text content
-        json metadata_json
-    }
-    DOCUMENT_SYNC_RUNS {
-        uuid id PK
-        uuid document_source_id FK
-        string idempotency_key UK
-        string status
-        int processed_count
-    }
-```
+[Source PlantUML du modèle relationnel](diagrams/modele-relationnel.puml)
 
 ## Règles d’intégrité
 

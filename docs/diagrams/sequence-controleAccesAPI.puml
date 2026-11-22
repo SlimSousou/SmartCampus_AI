@@ -1,0 +1,149 @@
+@startuml
+skinparam defaultFontSize 14
+skinparam defaultFontColor #333333
+!include https://static.visual-paradigm.com/web/resources/plantuml-stdlib/themes/vp.puml
+skinparam sequenceParticipant underline
+skinparam vpDiagramType InteractionDiagram
+
+title Contrôle d'accès API — Session invitée et rattachement au compte
+
+actor "Candidat (navigateur)" as Cand
+participant "Frontend Next.js" as Front
+participant "Reverse proxy HTTPS" as Proxy
+participant "API FastAPI\n(auth + permissions)" as API
+participant "Service conversationnel" as Conv
+participant "PostgreSQL\n(sessions, comptes, audit)" as DB
+
+== 1. Ouverture d'une session invitée ==
+Cand -> Front : Ouvrir le chat
+activate Front
+Front -> Proxy : POST /api/v1/guest-sessions
+activate Proxy
+Proxy -> API : relais HTTPS
+activate API
+API -> API : contrôle de débit public
+API -> DB : créer session (empreinte du secret,\nexpiration, quotas)
+activate DB
+DB --> API : session_id
+deactivate DB
+API --> Proxy : 201 + Set-Cookie HttpOnly/Secure/SameSite\n(corps JSON sans secret de session)
+deactivate API
+Proxy --> Front : 201 + cookie
+deactivate Proxy
+Front --> Cand : Chat disponible
+deactivate Front
+
+== 2. Message texte anonyme ==
+Cand -> Front : "Quelles formations en informatique à l'IIT ?"
+activate Front
+Front -> Proxy : POST /api/v1/guest-sessions/{session_id}/messages\n+ client_message_id + cookie
+activate Proxy
+Proxy -> API : relais HTTPS
+activate API
+API -> DB : vérifier cookie = empreinte de session,\npropriété, expiration, quotas
+activate DB
+DB --> API : session valide + quota restant
+deactivate DB
+alt Session valide et quota disponible
+  API -> Conv : traiter le message (idempotent\npar client_message_id)
+  activate Conv
+  Conv --> API : réponse + sources RAG publiées
+  deactivate Conv
+  API -> DB : journaliser l'usage (acteur session,\ndate, résultat; sans secret)
+  activate DB
+  DB --> API : ok
+  deactivate DB
+  API --> Proxy : 200 OK (message_id, text, sources)
+else Cookie absent, expiré ou autre session
+  API --> Proxy : 401 authentication_required
+else Quota ou limite de taille atteint
+  API --> Proxy : 429 rate_limited
+end
+deactivate API
+Proxy --> Front : réponse
+deactivate Proxy
+Front --> Cand : réponse + citations
+deactivate Front
+
+== 3. Accès aux espaces internes ==
+actor "Responsable académique ISB" as Staff
+participant "Frontend Next.js" as Front2
+participant "Reverse proxy HTTPS" as Proxy2
+participant "API FastAPI\n(auth + permissions)" as API2
+participant "PostgreSQL\n(sessions, comptes, audit)" as DB2
+
+Staff -> Front2 : Consulter un dossier candidat
+activate Front2
+Front2 -> Proxy2 : GET /api/v1/academic/candidates/{candidate_id}\nAuthorization: Bearer <access_token>
+activate Proxy2
+Proxy2 -> API2 : relais HTTPS
+activate API2
+API2 -> DB2 : valider le jeton d'accès
+activate DB2
+DB2 --> API2 : identité + rôles effectifs
+deactivate DB2
+alt Jeton absent ou invalide
+  API2 --> Proxy2 : 401 authentication_required
+else Rôle insuffisant pour la route
+  API2 --> Proxy2 : 403 permission_denied
+else Permission fonctionnelle accordée
+  API2 -> DB2 : charger le dossier selon propriétaire,\nétablissement du rôle et état métier
+  activate DB2
+  DB2 --> API2 : dossier IIT ou aucun résultat
+  deactivate DB2
+  alt Dossier dans le périmètre ISB
+    API2 -> DB2 : écrire un événement d'audit\n(acteur, action, objet, date, résultat)
+    activate DB2
+    DB2 --> API2 : ok
+    deactivate DB2
+    API2 --> Proxy2 : 200 OK (vue limitée au périmètre)
+  else Dossier hors périmètre ou inexistant
+    API2 --> Proxy2 : 404 not_found (sans révéler l'existence)
+  end
+end
+deactivate API2
+Proxy2 --> Front2 : réponse (ou problem+json)
+deactivate Proxy2
+Front2 --> Staff : affichage ou message d'erreur
+deactivate Front2
+
+== 4. Rattachement d'une session invitée à un compte ==
+Cand -> Front : Se connecter puis confirmer le consentement
+activate Front
+Front -> Proxy : POST /api/v1/auth/login
+activate Proxy
+Proxy -> API : relais HTTPS
+activate API
+API -> DB : vérifier les identifiants
+activate DB
+DB --> API : identité + rôles
+deactivate DB
+API --> Proxy : 200 + access token court\n+ cookie de renouvellement (rotation)
+deactivate API
+Proxy --> Front : jetons
+deactivate Proxy
+Front -> Proxy : POST /api/v1/me/conversations/attach\n{"guest_session_id":"...","consent":true}
+activate Proxy
+Proxy -> API : relais HTTPS + Bearer + cookie invité
+activate API
+API -> DB : vérifier propriété du cookie, consentement,\nabsence de rattachement antérieur (transaction)
+activate DB
+DB --> API : ok
+API -> DB : rattacher session au compte + audit\n(atomique) ou rollback complet
+activate DB
+DB --> API : rattachement enregistré
+deactivate DB
+alt Rattachement réussi
+  API --> Proxy : 200 OK
+else Session déjà rattachée à un autre compte
+  API --> Proxy : 409 state_conflict
+else Consentement absent
+  API --> Proxy : 422 business_validation_failed
+end
+deactivate API
+Proxy --> Front : réponse
+deactivate Proxy
+Front --> Cand : historique conservé ou erreur
+deactivate Front
+
+@enduml
