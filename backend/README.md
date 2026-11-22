@@ -2,33 +2,7 @@
 
 Socle SA-27/SA-28 et SA-10 à SA-18 : authentification et rôles, catalogue académique, profils et candidatures, recommandations, sources documentaires et synchronisations.
 
-## Démarrage Docker autonome
-
-Depuis le dossier `backend` :
-
-```powershell
-docker compose up --build -d
-docker compose ps
-docker compose logs -f api
-```
-
-L’API est disponible sur `http://127.0.0.1:8000`, la documentation sur `/docs` et l’état sur `/api/v1/health`. Compose construit le backend, attend PostgreSQL, applique `alembic upgrade head`, puis démarre Uvicorn. La base PostgreSQL reste dans un volume Docker persistant.
-
-Pour voir les migrations ou appliquer le seed de démonstration :
-
-```powershell
-docker compose exec api python -m alembic upgrade head
-docker compose exec api python -m app.seed_demo
-docker compose down
-```
-
-Pour supprimer aussi les données PostgreSQL locales :
-
-```powershell
-docker compose down -v
-```
-
-## Démarrage local sans Docker
+## Démarrage local
 
 Depuis le dossier `backend` :
 
@@ -37,7 +11,6 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
-python -m alembic upgrade head
 python -m app.bootstrap_admin
 uvicorn app.main:app --reload
 ```

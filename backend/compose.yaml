@@ -16,27 +16,5 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      SMARTCAMPUS_APP_ENV: development
-      SMARTCAMPUS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smartcampus}:${POSTGRES_PASSWORD:-smartcampus_dev_only}@db:5432/${POSTGRES_DB:-smartcampus}
-      SMARTCAMPUS_JWT_SECRET_KEY: ${SMARTCAMPUS_JWT_SECRET_KEY:-development-only-change-this-secret-before-deployment}
-      SMARTCAMPUS_COOKIE_SECURE: "false"
-      SMARTCAMPUS_AUTO_CREATE_TABLES: "false"
-    ports:
-      - "${API_PORT:-8000}:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   smartcampus-postgres:

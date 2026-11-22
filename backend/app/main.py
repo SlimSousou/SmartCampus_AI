@@ -28,19 +28,6 @@ def create_app(database_url: str | None = None, auto_create_tables: bool | None 
     application.state.session_factory = create_session_factory(engine)
     application.include_router(router)
 
-    @application.get("/")
-    async def root() -> dict[str, str]:
-        return {
-            "name": "SmartCampus AI API",
-            "status": "running",
-            "docs": "/docs",
-            "health": "/api/v1/health",
-        }
-
-    @application.get("/api/v1/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
-
     @application.middleware("http")
     async def add_request_id(request: Request, call_next):
         request_id = str(uuid4())
