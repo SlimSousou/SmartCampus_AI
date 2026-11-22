@@ -45,7 +45,7 @@ class ProgramLevel(StrEnum):
     BACHELOR = "bachelor"
     ENGINEERING = "engineering"
     OTHER = "other"
-
+   
 
 class User(Base):
     __tablename__ = "users"

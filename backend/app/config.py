@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 7
     cookie_secure: bool = False
-    auto_create_tables: bool = True
+    auto_create_tables: bool = False
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
