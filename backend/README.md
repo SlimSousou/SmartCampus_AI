@@ -4,7 +4,7 @@ Socle SA-27/SA-28 et SA-10 à SA-18 : authentification et rôles, catalogue acad
 
 ## Démarrage Docker autonome
 
-Depuis le dossier `backend` :
+Depuis la racine du projet :
 
 ```powershell
 docker compose up --build -d

@@ -1,3 +1,5 @@
+name: smartcampus-ai
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -18,7 +20,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
@@ -38,5 +40,17 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
 volumes:
   smartcampus-postgres:
+    name: backend_smartcampus-postgres
