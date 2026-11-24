@@ -65,4 +65,17 @@ python -m app.seed_demo
 
 Les formations créées par `seed_demo` sont fictives, marquées `is_demo=true` et non publiées; elles ne représentent pas le catalogue officiel. Le script est idempotent et ne crée aucun compte ni mot de passe de démonstration.
 
-Ce socle n’implémente pas encore la vérification d’adresse email, la récupération de mot de passe, les limites distribuées de connexion, ni les rôles académiques cloisonnés par attribut d’établissement. En production, protéger l’API contre les tentatives répétées au reverse proxy ou avec un service de limitation partagé.
+Ce socle n’implémente pas encore la vérification d’adresse email, la récupération de mot de passe ni les limites distribuées de connexion. En production, protéger l’API contre les tentatives répétées au reverse proxy ou avec un service de limitation partagé.
+
+## Catalogue et informations officielles (SA-19 à SA-22)
+
+La documentation interactive `/docs` décrit les paramètres et les réponses. Les routes suivantes sont préfixées par `/api/v1` :
+
+- `/programs` : formations, recherche, filtres par établissement et niveau, pagination et publication ;
+- `/specialties`, `/curricula` et `/subjects` : spécialités, programmes pédagogiques et matières ;
+- `/fees`, `/payment-terms` et `/admission-conditions` : tarifs, modalités de paiement et conditions d’admission ;
+- `/programs/{program_id}/official-info` : synthèse des informations officielles actuellement valides.
+
+Les lectures publiques n’exposent que les formations publiées et non fictives, ainsi que les informations officielles publiées, actives et dans leur période de validité. Les informations officielles sont créées en brouillon ; utilisez `POST /fees/{id}/publish`, `POST /payment-terms/{id}/publish` ou `POST /admission-conditions/{id}/publish` pour les publier. Une modification de contenu publié le remet en brouillon. Les actions `draft` et `archive` sont également disponibles. Une formation doit elle-même être publiée via `POST /programs/{id}/publish` avant la publication de ses informations officielles.
+
+Les écritures sont réservées à l’administrateur ou au responsable académique de l’établissement concerné (`academic_iit` ou `academic_isb`). Les responsables peuvent consulter leurs brouillons avec `include_inactive=true`. Les données de démonstration ne constituent pas des tarifs officiels ; elles nécessitent une validation et une publication par les responsables compétents.

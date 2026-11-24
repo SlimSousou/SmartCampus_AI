@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import models
 from .auth import router
+from .catalog import router as catalog_router
 from .config import settings
 from .database import Base, create_database_engine, create_session_factory
 
@@ -27,6 +28,7 @@ def create_app(database_url: str | None = None, auto_create_tables: bool | None 
     application.state.engine = engine
     application.state.session_factory = create_session_factory(engine)
     application.include_router(router)
+    application.include_router(catalog_router)
 
     @application.get("/")
     async def root() -> dict[str, str]:

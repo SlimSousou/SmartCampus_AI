@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
@@ -45,7 +45,12 @@ class ProgramLevel(StrEnum):
     BACHELOR = "bachelor"
     ENGINEERING = "engineering"
     OTHER = "other"
-   
+
+
+class PublicationStatus(StrEnum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 class User(Base):
     __tablename__ = "users"
@@ -88,7 +93,7 @@ class Program(Base):
     __table_args__ = (
         CheckConstraint("institution IN ('IIT', 'ISB')", name="ck_programs_institution"),
         CheckConstraint(
-            "level IN ('preparatory', 'bachelor', 'engineering', 'other')",
+            "level IN ('licence', 'prepa', 'ingenierie', 'preparatory', 'bachelor', 'engineering', 'other')",
             name="ck_programs_level",
         ),
         UniqueConstraint("institution", "name", name="uq_programs_institution_name"),
@@ -105,6 +110,162 @@ class Program(Base):
     career_prospects: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class Specialty(Base):
+    __tablename__ = "specialties"
+    __table_args__ = (UniqueConstraint("program_id", "name", name="uq_specialties_program_name"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Curriculum(Base):
+    __tablename__ = "curricula"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    specialty_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("specialties.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255))
+    academic_year: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    __table_args__ = (
+        UniqueConstraint("curriculum_id", "code", name="uq_subjects_curriculum_code"),
+        CheckConstraint("semester IS NULL OR semester BETWEEN 1 AND 12", name="ck_subjects_semester"),
+        CheckConstraint("credits IS NULL OR credits BETWEEN 0 AND 60", name="ck_subjects_credits"),
+        CheckConstraint("coefficient IS NULL OR coefficient BETWEEN 0 AND 20", name="ck_subjects_coefficient"),
+        CheckConstraint("hours IS NULL OR hours BETWEEN 0 AND 2000", name="ck_subjects_hours"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    curriculum_id: Mapped[UUID] = mapped_column(ForeignKey("curricula.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    name: Mapped[str] = mapped_column(String(255))
+    semester: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credits: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    coefficient: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    hours: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Fee(Base):
+    __tablename__ = "fees"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_fees_amount_nonnegative"),
+        CheckConstraint("length(currency) = 3 AND currency = upper(currency)", name="ck_fees_currency_iso"),
+        CheckConstraint("period IN ('annual', 'semester', 'one_time')", name="ck_fees_period"),
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archived')",
+            name="ck_fees_status",
+        ),
+        CheckConstraint(
+            "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from",
+            name="ck_fees_validity_period",
+        ),
+        Index("ix_fees_program_status", "program_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(255))
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    currency: Mapped[str] = mapped_column(String(3), default="TND")
+    period: Mapped[str] = mapped_column(String(16))
+    description: Mapped[str] = mapped_column(Text, default="")
+    academic_year: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    valid_from: Mapped[date | None] = mapped_column(nullable=True)
+    valid_until: Mapped[date | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=PublicationStatus.DRAFT.value, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class AdmissionCondition(Base):
+    __tablename__ = "admission_conditions"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('diploma', 'average', 'document', 'exam', 'language', 'age', 'other')",
+            name="ck_admission_conditions_kind",
+        ),
+        CheckConstraint("threshold IS NULL OR threshold >= 0", name="ck_admission_conditions_threshold"),
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archived')",
+            name="ck_admission_conditions_status",
+        ),
+        CheckConstraint(
+            "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from",
+            name="ck_admission_conditions_validity_period",
+        ),
+        Index("ix_admission_conditions_program_status", "program_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    required: Mapped[bool] = mapped_column(Boolean, default=True)
+    threshold: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    academic_year: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    valid_from: Mapped[date | None] = mapped_column(nullable=True)
+    valid_until: Mapped[date | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=PublicationStatus.DRAFT.value, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class PaymentTerm(Base):
+    __tablename__ = "payment_terms"
+    __table_args__ = (
+        CheckConstraint(
+            "method IN ('bank_transfer', 'cash', 'cheque', 'card', 'online', 'other')",
+            name="ck_payment_terms_method",
+        ),
+        CheckConstraint("installments BETWEEN 1 AND 36", name="ck_payment_terms_installments"),
+        CheckConstraint(
+            "down_payment_percent IS NULL OR down_payment_percent BETWEEN 0 AND 100",
+            name="ck_payment_terms_down_payment_percent",
+        ),
+        CheckConstraint("status IN ('draft', 'published', 'archived')", name="ck_payment_terms_status"),
+        CheckConstraint(
+            "valid_until IS NULL OR valid_from IS NULL OR valid_until >= valid_from",
+            name="ck_payment_terms_validity_period",
+        ),
+        Index("ix_payment_terms_program_status", "program_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    program_id: Mapped[UUID] = mapped_column(ForeignKey("programs.id", ondelete="CASCADE"), index=True)
+    fee_id: Mapped[UUID | None] = mapped_column(ForeignKey("fees.id", ondelete="SET NULL"), nullable=True)
+    method: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    installments: Mapped[int] = mapped_column(Integer, default=1)
+    down_payment_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    due_date: Mapped[date | None] = mapped_column(nullable=True)
+    academic_year: Mapped[str | None] = mapped_column(String(9), nullable=True)
+    valid_from: Mapped[date | None] = mapped_column(nullable=True)
+    valid_until: Mapped[date | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default=PublicationStatus.DRAFT.value, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 

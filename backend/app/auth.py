@@ -88,6 +88,25 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def get_optional_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: DbSession,
+) -> User | None:
+    if credentials is None:
+        return None
+    try:
+        user_id = decode_access_token(credentials.credentials)
+    except (jwt.InvalidTokenError, ValueError, KeyError):
+        raise _unauthorized() from None
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise _unauthorized()
+    return user
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 def require_roles(*roles: Role) -> Callable[[CurrentUser], User]:
     def check_role(user: CurrentUser) -> User:
         if user.role not in {role.value for role in roles}:
