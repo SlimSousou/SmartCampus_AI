@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     refresh_token_days: int = 7
     cookie_secure: bool = False
     auto_create_tables: bool = False
+    llm_provider: str = "disabled"
+    llm_model: str | None = None
+    llm_api_key: str | None = None
+    llm_base_url: str | None = None
+    llm_timeout_seconds: int = 30
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
@@ -31,6 +36,10 @@ class Settings(BaseSettings):
                 raise ValueError("Disable automatic schema creation in production; use migrations.")
         if self.access_token_minutes < 1 or self.refresh_token_days < 1:
             raise ValueError("Token lifetimes must be positive.")
+        if self.llm_provider not in {"disabled", "openai_compatible"}:
+            raise ValueError("LLM provider must be disabled or openai_compatible.")
+        if self.llm_timeout_seconds < 1:
+            raise ValueError("LLM timeout must be positive.")
         return self
 
 
